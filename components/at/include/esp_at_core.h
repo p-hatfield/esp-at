@@ -90,7 +90,8 @@ typedef enum {
  */
 typedef struct {
     void (*status_callback)(esp_at_status_type status);               /*!< callback when AT status changes */
-    void (*pre_sleep_callback)(at_sleep_mode_t mode);                 /*!< callback before enter modem sleep and light sleep */
+    void (*pre_sleep_callback)(at_sleep_mode_t mode);                 /*!< callback before entering light sleep */
+    void (*pre_wakeup_callback)(void);                                /*!< callback before waking up from light sleep */
     void (*pre_deepsleep_callback)(void);                             /*!< callback before enter deep sleep */
     void (*pre_restart_callback)(void);                               /*!< callback before restart */
     void (*pre_active_write_data_callback)(at_write_data_fn_t);       /*!< callback before write data */
@@ -262,6 +263,15 @@ void esp_at_transmit_terminal(void);
  *
  */
 bool esp_at_custom_cmd_array_regist(const esp_at_cmd_struct *custom_at_cmd_array, uint32_t cmd_num);
+
+/**
+ * @brief regist at command set, which defined by hfp ag,
+ *
+ * @param hfp_ag_at_cmd_array at command set
+ * @param cmd_num command number
+ *
+ */
+bool esp_at_hfp_ag_cmd_array_regist(const esp_at_cmd_struct *hfp_ag_at_cmd_array, uint32_t cmd_num);
 
 /**
  * @brief regist device operate functions set,

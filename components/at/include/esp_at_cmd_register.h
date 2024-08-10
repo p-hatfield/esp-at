@@ -277,3 +277,10 @@ bool esp_at_web_server_cmd_regist(void);
  * @return true if success, otherwise false.
  */
 bool esp_at_rainmaker_cmd_regist(void);
+
+/**
+ * @brief Register the hfp ag AT commands.
+ *
+ * @return true if success, otherwise false.
+ */
+bool esp_at_hfp_ag_cmd_regist(void);
