@@ -9,6 +9,7 @@
 #include "esp_mac.h"
 #include "esp_at.h"
 #include "esp_hf_ag_api.h"
+#include "esp_gap_bt_api.h"
 
 static char* HFP_AG_VERSION = "v0.0.1\r\n";
 
@@ -25,12 +26,12 @@ typedef enum
 static char* at_hfp_ag_str[] = 
 {
     /*Input*/
-    "HFGAPINIT", //AT_HFP_AG_INIT
-    "HFPAGCONNECTSVC", //AT_HFP_AG_CONNECT_SVC
-    "HFPAGCONNECTAUD", //AT_HFP_AG_CONNECT_AUD
+    "HFPAGINIT",        //AT_HFP_AG_INIT
+    "HFPAGCONNECTSVC",  //AT_HFP_AG_CONNECT_SVC
+    "HFPAGCONNECTAUD",  //AT_HFP_AG_CONNECT_AUD
     /*Output*/
-    "HFPAGCONNECTSTS", //AT_HFP_AG_CONNECT_STATUS
-    "HFPAGAUDIOSTS", //AT_HFP_AG_AUDIO_STATUS
+    "HFPAGCONNECTSTS",  //AT_HFP_AG_CONNECT_STATUS
+    "HFPAGAUDIOSTS",    //AT_HFP_AG_AUDIO_STATUS
 };
 
 static void at_hfp_ag_get_address(esp_bd_addr_t *bytes);
@@ -99,10 +100,20 @@ static void at_hfp_ag_handle_bvra_resp(esp_hf_cb_param_t *param)
 }
 static void at_hfp_ag_handle_volume_control(esp_hf_cb_param_t *param)
 {
+    uint8_t buffer[64] = {0};
+    snprintf((char *)buffer, 64, "Volume change requested:%i,%i\r\n", param->volume_control.type, param->volume_control.volume);
+    esp_at_port_write_data(buffer, strlen((char *)buffer));
+
+    esp_hf_ag_volume_control(param->volume_control.remote_addr, param->volume_control.type, 15);
+    esp_hf_ag_volume_control(param->volume_control.remote_addr, param->volume_control.type + 1, 15);
 }
 static void at_hfp_ag_handle_unat_resp(esp_hf_cb_param_t *param)
 {
-    esp_at_port_write_data((uint8_t *)param->unat_rep.unat, strlen((char *)param->unat_rep.unat));
+    uint8_t buffer[64] = {0};
+    snprintf((char *)buffer, 64, "%s\r\n", param->unat_rep.unat);
+    esp_at_port_write_data(buffer, strlen((char *)buffer));
+    
+    esp_hf_ag_unknown_at_send(param->unat_rep.remote_addr, NULL);
 }
 static void at_hfp_ag_handle_ind_update(esp_hf_cb_param_t *param)
 {
@@ -204,10 +215,13 @@ static uint8_t at_exe_cmd_hfp_ag_connect_service(uint8_t para_num)
     return result == ESP_OK ? ESP_AT_RESULT_CODE_OK : ESP_AT_RESULT_CODE_ERROR;
 }
 
-static uint8_t at_exe_cmd_hfp_ag_connect_Audio(uint8_t para_num)
+static uint8_t at_exe_cmd_hfp_ag_connect_audio(uint8_t para_num)
 {
     esp_bd_addr_t bytes;
     at_hfp_ag_get_address(&bytes);
+
+    //esp_hf_ag_volume_control(bytes, ESP_HF_VOLUME_CONTROL_TARGET_SPK, 15);
+    //esp_hf_ag_volume_control(bytes, ESP_HF_VOLUME_CONTROL_TARGET_MIC, 15);
 
     esp_err_t result = esp_hf_ag_audio_connect(bytes);
     return result == ESP_OK ? ESP_AT_RESULT_CODE_OK : ESP_AT_RESULT_CODE_ERROR;
@@ -217,7 +231,7 @@ static const esp_at_cmd_struct at_hfp_ag_cmd[] = {
     {"+HFPAG", at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_para, at_exe_cmd_hfp_ag},
     {"+HFPAGINIT", at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_init, at_hfp_ag_unrecognized_cmd},
     {"+HFPAGCONNECTSVC", at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_connect_service, at_hfp_ag_unrecognized_cmd},
-    {"+HFPAGCONNECTAUD", at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_connect_service, at_hfp_ag_unrecognized_cmd},
+    {"+HFPAGCONNECTAUD", at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_connect_audio, at_hfp_ag_unrecognized_cmd},
 };
 
 bool esp_at_hfp_ag_cmd_regist(void)
