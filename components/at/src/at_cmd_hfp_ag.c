@@ -17,21 +17,33 @@ typedef enum
 {
     AT_HFP_AG_INIT,
     AT_HFP_AG_CONNECT_SVC,
+    AT_HFP_AG_DISCONNECT_SVC,
     AT_HFP_AG_CONNECT_AUD,
+    AT_HFP_AG_DISCONNECT_AUD,
+    AT_HFP_AG_SET_MIC_VOL,
+    AT_HFP_AG_SET_SPK_VOL,
 
     AT_HFP_AG_CONNECT_STATUS,
-    AT_HFP_AG_AUDIO_STATUS
+    AT_HFP_AG_AUDIO_STATUS,
+    AT_HFP_AG_MIC_VOL_STATUS,
+    AT_HFP_AG_SPK_VOL_STATUS,
 }at_hfp_ag_t;
 
-static char* at_hfp_ag_str[] = 
+static const char * const at_hfp_ag_str[] = 
 {
     /*Input*/
-    "HFPAGINIT",        //AT_HFP_AG_INIT
-    "HFPAGCONNECTSVC",  //AT_HFP_AG_CONNECT_SVC
-    "HFPAGCONNECTAUD",  //AT_HFP_AG_CONNECT_AUD
+    "+HFPAGINIT",            //AT_HFP_AG_INIT
+    "+HFPAGCONNECTSVC",      //AT_HFP_AG_CONNECT_SVC
+    "+HFPAGDISCONNECTSVC",   //AT_HFP_AG_DISCONNECT_SVC
+    "+HFPAGCONNECTAUD",      //AT_HFP_AG_CONNECT_AUD
+    "+HFPAGDISCONNECTAUD",   //AT_HFP_AG_DISCONNECT_AUD
+    "+HFPAGSETMICVOL",       //AT_HFP_AG_SET_MIC_VOL
+    "+HFPAGSETSPKVOL",       //AT_HFP_AG_SET_SPK_VOL
     /*Output*/
-    "HFPAGCONNECTSTS",  //AT_HFP_AG_CONNECT_STATUS
-    "HFPAGAUDIOSTS",    //AT_HFP_AG_AUDIO_STATUS
+    "+HFPAGCONNECTSTS",      //AT_HFP_AG_CONNECT_STATUS
+    "+HFPAGAUDIOSTS",        //AT_HFP_AG_AUDIO_STATUS
+    "+HFPAGMICVOLSTS",       //AT_HFP_AG_MIC_VOL_STATUS
+    "+HFPAGSPKVOLSTS"        //AT_HFP_AG_SPK_VOL_STATUS
 };
 
 static void at_hfp_ag_get_address(esp_bd_addr_t *bytes);
@@ -86,13 +98,13 @@ static void at_hfp_ag_callback(esp_hf_cb_event_t event, esp_hf_cb_param_t *param
 static void at_hfp_ag_handle_connection_state(esp_hf_cb_param_t *param)
 {
     uint8_t buffer[64] = {0};
-    snprintf((char *)buffer, 64, "AT+%s=%i\r\n", at_hfp_ag_str[AT_HFP_AG_CONNECT_STATUS], param->conn_stat.state);
+    snprintf((char *)buffer, 64, "AT%s=%i\r\n", at_hfp_ag_str[AT_HFP_AG_CONNECT_STATUS], param->conn_stat.state);
     esp_at_port_write_data(buffer, strlen((char *)buffer));
 }
 static void at_hfp_ag_handle_audio_state(esp_hf_cb_param_t *param)
 {
     uint8_t buffer[64] = {0};
-    snprintf((char *)buffer, 64, "AT+%s=%i\r\n", at_hfp_ag_str[AT_HFP_AG_AUDIO_STATUS], param->conn_stat.state);
+    snprintf((char *)buffer, 64, "AT%s=%i\r\n", at_hfp_ag_str[AT_HFP_AG_AUDIO_STATUS], param->conn_stat.state);
     esp_at_port_write_data(buffer, strlen((char *)buffer));
 }
 static void at_hfp_ag_handle_bvra_resp(esp_hf_cb_param_t *param)
@@ -100,17 +112,15 @@ static void at_hfp_ag_handle_bvra_resp(esp_hf_cb_param_t *param)
 }
 static void at_hfp_ag_handle_volume_control(esp_hf_cb_param_t *param)
 {
+    const char * atCmd = param->volume_control.type == ESP_HF_VOLUME_TYPE_SPK ? at_hfp_ag_str[AT_HFP_AG_SPK_VOL_STATUS] : at_hfp_ag_str[AT_HFP_AG_MIC_VOL_STATUS];
     uint8_t buffer[64] = {0};
-    snprintf((char *)buffer, 64, "Volume change requested:%i,%i\r\n", param->volume_control.type, param->volume_control.volume);
+    snprintf((char *)buffer, 64, "AT%s=%i\r\n", atCmd, param->volume_control.volume);
     esp_at_port_write_data(buffer, strlen((char *)buffer));
-
-    esp_hf_ag_volume_control(param->volume_control.remote_addr, param->volume_control.type, 15);
-    esp_hf_ag_volume_control(param->volume_control.remote_addr, param->volume_control.type + 1, 15);
 }
 static void at_hfp_ag_handle_unat_resp(esp_hf_cb_param_t *param)
 {
     uint8_t buffer[64] = {0};
-    snprintf((char *)buffer, 64, "%s\r\n", param->unat_rep.unat);
+    snprintf((char *)buffer, 64, "AT%s\r\n", param->unat_rep.unat);
     esp_at_port_write_data(buffer, strlen((char *)buffer));
     
     esp_hf_ag_unknown_at_send(param->unat_rep.remote_addr, NULL);
@@ -121,9 +131,6 @@ static void at_hfp_ag_handle_ind_update(esp_hf_cb_param_t *param)
 static void at_hfp_ag_handle_cind_resp(esp_hf_cb_param_t *param)
 {
     uint8_t buffer[64] = {0};
-    snprintf((char *)buffer, 64, "CIND message received\r\n");
-    esp_at_port_write_data(buffer, strlen((char *)buffer));
-
     esp_bd_addr_t remote_addr;
     memcpy(remote_addr, param->cind_rep.remote_addr, sizeof(remote_addr));
     esp_hf_call_status_t call_state = ESP_HF_CALL_STATUS_NO_CALLS;
@@ -135,8 +142,6 @@ static void at_hfp_ag_handle_cind_resp(esp_hf_cb_param_t *param)
     esp_hf_call_held_status_t call_held_status = ESP_HF_CALL_HELD_STATUS_NONE;
 
     esp_err_t result = esp_hf_ag_cind_response(remote_addr, call_state, call_setup_state, ntk_state, signal, roam, batt_lev, call_held_status);
-    
-    snprintf((char *)buffer, 64, "CIND response result: %i\r\n", result);
     esp_at_port_write_data(buffer, strlen((char *)buffer));
 }
 static void at_hfp_ag_handle_cops_resp(esp_hf_cb_param_t *param)
@@ -208,31 +213,82 @@ static uint8_t at_exe_cmd_hfp_ag_init(uint8_t para_num)
 
 static uint8_t at_exe_cmd_hfp_ag_connect_service(uint8_t para_num)
 {
-    esp_bd_addr_t bytes;
-    at_hfp_ag_get_address(&bytes);
+    esp_bd_addr_t addr;
+    at_hfp_ag_get_address(&addr);
 
-    esp_err_t result = esp_hf_ag_slc_connect(bytes);
+    esp_err_t result = esp_hf_ag_slc_connect(addr);
     return result == ESP_OK ? ESP_AT_RESULT_CODE_OK : ESP_AT_RESULT_CODE_ERROR;
 }
 
 static uint8_t at_exe_cmd_hfp_ag_connect_audio(uint8_t para_num)
 {
-    esp_bd_addr_t bytes;
-    at_hfp_ag_get_address(&bytes);
+    esp_bd_addr_t addr;
+    at_hfp_ag_get_address(&addr);
 
-    //esp_hf_ag_volume_control(bytes, ESP_HF_VOLUME_CONTROL_TARGET_SPK, 15);
-    //esp_hf_ag_volume_control(bytes, ESP_HF_VOLUME_CONTROL_TARGET_MIC, 15);
-
-    esp_err_t result = esp_hf_ag_audio_connect(bytes);
+    esp_err_t result = esp_hf_ag_audio_connect(addr);
     return result == ESP_OK ? ESP_AT_RESULT_CODE_OK : ESP_AT_RESULT_CODE_ERROR;
 }
 
+static uint8_t at_exe_cmd_hfp_ag_disconnect_service(uint8_t para_num)
+{
+    esp_bd_addr_t addr;
+    at_hfp_ag_get_address(&addr);
+
+    esp_err_t result = esp_hf_ag_slc_disconnect(addr);
+    return result == ESP_OK ? ESP_AT_RESULT_CODE_OK : ESP_AT_RESULT_CODE_ERROR;
+}
+
+static uint8_t at_exe_cmd_hfp_ag_disconnect_audio(uint8_t para_num)
+{
+    esp_bd_addr_t addr;
+    at_hfp_ag_get_address(&addr);
+
+    esp_err_t result = esp_hf_ag_audio_disconnect(addr);
+    return result == ESP_OK ? ESP_AT_RESULT_CODE_OK : ESP_AT_RESULT_CODE_ERROR;
+}
+
+static uint8_t at_exe_cmd_hfp_ag_set_mic_vol(uint8_t para_num)
+{
+    esp_bd_addr_t addr;
+    int32_t value;
+    esp_err_t result = ESP_FAIL;
+    at_hfp_ag_get_address(&addr);
+
+    if(esp_at_get_para_as_digit(1, &value) == ESP_AT_PARA_PARSE_RESULT_OK)
+    {
+        result = esp_hf_ag_volume_control(addr, ESP_HF_VOLUME_CONTROL_TARGET_MIC, value);        
+    }
+    return result == ESP_OK ? ESP_AT_RESULT_CODE_OK : ESP_AT_RESULT_CODE_ERROR;
+}
+
+static uint8_t at_exe_cmd_hfp_ag_set_spk_vol(uint8_t para_num)
+{
+    esp_bd_addr_t addr;
+    int32_t value;
+    esp_err_t result = ESP_FAIL;
+    at_hfp_ag_get_address(&addr);
+
+    if(esp_at_get_para_as_digit(1, &value) == ESP_AT_PARA_PARSE_RESULT_OK)
+    {
+        result = esp_hf_ag_volume_control(addr, ESP_HF_VOLUME_CONTROL_TARGET_SPK, value);        
+    }
+    return result == ESP_OK ? ESP_AT_RESULT_CODE_OK : ESP_AT_RESULT_CODE_ERROR;
+}
+
+/*Ignoring warning to avoid changing API source*/
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
 static const esp_at_cmd_struct at_hfp_ag_cmd[] = {
     {"+HFPAG", at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_para, at_exe_cmd_hfp_ag},
-    {"+HFPAGINIT", at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_init, at_hfp_ag_unrecognized_cmd},
-    {"+HFPAGCONNECTSVC", at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_connect_service, at_hfp_ag_unrecognized_cmd},
-    {"+HFPAGCONNECTAUD", at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_connect_audio, at_hfp_ag_unrecognized_cmd},
+    {at_hfp_ag_str[AT_HFP_AG_INIT], at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_init, at_hfp_ag_unrecognized_cmd},
+    {at_hfp_ag_str[AT_HFP_AG_CONNECT_SVC], at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_connect_service, at_hfp_ag_unrecognized_cmd},
+    {at_hfp_ag_str[AT_HFP_AG_DISCONNECT_SVC], at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_disconnect_service, at_hfp_ag_unrecognized_cmd},
+    {at_hfp_ag_str[AT_HFP_AG_CONNECT_AUD], at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_connect_audio, at_hfp_ag_unrecognized_cmd},
+    {at_hfp_ag_str[AT_HFP_AG_DISCONNECT_AUD], at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_disconnect_audio, at_hfp_ag_unrecognized_cmd},
+    {at_hfp_ag_str[AT_HFP_AG_SET_MIC_VOL], at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_set_mic_vol, at_hfp_ag_unrecognized_cmd},
+    {at_hfp_ag_str[AT_HFP_AG_SET_SPK_VOL], at_hfp_ag_unrecognized_cmd, at_hfp_ag_unrecognized_cmd, at_exe_cmd_hfp_ag_set_spk_vol, at_hfp_ag_unrecognized_cmd},
 };
+#pragma GCC diagnostic pop
 
 bool esp_at_hfp_ag_cmd_regist(void)
 {
