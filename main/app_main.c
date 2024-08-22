@@ -9,7 +9,6 @@
 
 #include "esp_at.h"
 #include "esp_at_init.h"
-#include "gpio_pcm_config.h"
 
 void app_main(void)
 {
@@ -19,6 +18,5 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_at_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    app_gpio_pcm_io_cfg();
     esp_at_init();
 }

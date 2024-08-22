@@ -273,6 +273,15 @@ bool esp_at_custom_cmd_array_regist(const esp_at_cmd_struct *custom_at_cmd_array
 bool esp_at_hfp_ag_cmd_array_regist(const esp_at_cmd_struct *hfp_ag_at_cmd_array, uint32_t cmd_num);
 
 /**
+ * @brief regist at command set, which defined by i2s,
+ *
+ * @param i2s_at_cmd_array at command set
+ * @param cmd_num command number
+ *
+ */
+bool esp_at_i2s_cmd_array_regist(const esp_at_cmd_struct *hfp_i2s_cmd_array, uint32_t cmd_num);
+
+/**
  * @brief regist device operate functions set,
  *
  * @param ops device operate functions set

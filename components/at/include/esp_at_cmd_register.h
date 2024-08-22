@@ -284,3 +284,10 @@ bool esp_at_rainmaker_cmd_regist(void);
  * @return true if success, otherwise false.
  */
 bool esp_at_hfp_ag_cmd_regist(void);
+
+/**
+ * @brief Register the I2S AT commands.
+ *
+ * @return true if success, otherwise false.
+ */
+bool esp_at_i2s_cmd_regist(void);

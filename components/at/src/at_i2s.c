@@ -10,7 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
-#include "driver/i2s.h"
+//#include "driver/i2s.h"
 
 #if defined(CONFIG_AT_BT_COMMAND_SUPPORT)
 #if defined(CONFIG_AT_BT_A2DP_COMMAND_SUPPORT)

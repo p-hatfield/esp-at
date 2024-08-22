@@ -95,6 +95,7 @@ ESP_AT_CMD_SET_FIRST_INIT_FN(esp_at_eth_cmd_regist, 20);
 #endif
 
 ESP_AT_CMD_SET_FIRST_INIT_FN(esp_at_hfp_ag_cmd_regist, 21);
+ESP_AT_CMD_SET_FIRST_INIT_FN(esp_at_i2s_cmd_regist, 22);
 
 void esp_at_cmd_set_register(void)
 {

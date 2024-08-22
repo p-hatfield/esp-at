@@ -69,9 +69,6 @@ static void at_hfp_ag_handle_packet_status(esp_hf_cb_param_t *param);
 
 static void at_hfp_ag_callback(esp_hf_cb_event_t event, esp_hf_cb_param_t *param)
 {
-    uint8_t buffer[64] = {0};
-    snprintf((char *)buffer, 64, "Event Hit: %i\r\n", event);
-    esp_at_port_write_data(buffer, strlen((char *)buffer));
     switch(event)
     {
         case ESP_HF_CONNECTION_STATE_EVT:   at_hfp_ag_handle_connection_state(param);   break;/*!< Connection state changed event */
